@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "GHome Fitness",
+    "slug": "ghome-fitness-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ghome.fitness",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "GHome Fitness reads your workouts, distance, and heart rate from Apple Health to track your endurance training.",
+        "NSHealthUpdateUsageDescription": "GHome Fitness writes completed workouts to Apple Health to keep your fitness data in sync.",
+        "NSMotionUsageDescription": "Used to track activity during workouts."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.ghome.fitness"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "ghomefitness",
+    "plugins": [
+      [
+        "react-native-health",
+        {
+          "isClinicalDataEnabled": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#22c55e",
+          "sounds": []
+        }
+      ]
+    ]
+  }
+}

@@ -1,5 +1,36 @@
 import { Phase, WeekPlan, DayPlan } from '../types';
 
+// Intensity Factor per session type (0–1 relative to threshold).
+// TSS_planned = (minutes / 60) × IF² × 100
+const SESSION_IF: Record<string, number> = {
+  'Kettlebell A': 0.65,
+  'Kettlebell B': 0.65,
+  'Kettlebell C + Run 3 (Easy)': 0.62,
+  'Run 1 (Easy + strides)': 0.60,
+  'Run 2 (Hills/Play)': 0.75,
+  'Road Ride (quality)': 0.80,
+  'Gravel Ride (Z2)': 0.65,
+};
+
+export function calcPlannedTSS(minutes: number, sessionName: string): number {
+  const IF = SESSION_IF[sessionName] ?? 0.65;
+  return Math.round((minutes / 60) * IF * IF * 100);
+}
+
+// Estimate TSS from an actual log using RPE as a proxy for IF
+export function calcActualTSS(durationMin: number, rpe: number, type: string): number {
+  let IF: number;
+  if (rpe <= 0) {
+    // No RPE — fall back to session-type default
+    IF = type === 'Bike' ? 0.68 : type === 'Run' ? 0.65 : 0.63;
+  } else if (rpe <= 3) { IF = 0.50; }
+  else if (rpe <= 5) { IF = 0.62; }
+  else if (rpe <= 7) { IF = 0.73; }
+  else if (rpe <= 8) { IF = 0.82; }
+  else { IF = 0.92; }
+  return Math.round((durationMin / 60) * IF * IF * 100);
+}
+
 export const PHASES: Phase[] = [
   { key: 'P1', weeks: [1, 2, 3, 4], focus: 'Technique & base strength' },
   { key: 'P2', weeks: [5, 6, 7, 8], focus: '20 kg intro, volume build' },
@@ -102,7 +133,9 @@ function buildDayPlan(day: DayKey, week: number, phase: string): DayPlan {
     }
   }
 
-  return { day, session: template.session, details: template.details, target, plannedMinutes, plannedKm, discipline: template.discipline };
+  const sessionIF = SESSION_IF[template.session] ?? 0.65;
+  const plannedTSS = calcPlannedTSS(plannedMinutes, template.session);
+  return { day, session: template.session, details: template.details, target, plannedMinutes, plannedKm, plannedTSS, sessionIF, discipline: template.discipline };
 }
 
 export function buildFullPlan(): WeekPlan[] {
@@ -110,8 +143,28 @@ export function buildFullPlan(): WeekPlan[] {
   return Array.from({ length: 24 }, (_, i) => {
     const week = i + 1;
     const phase = getPhaseForWeek(week);
-    return { week, phase, days: days.map(d => buildDayPlan(d, week, phase)) };
+    const dayPlans = days.map(d => buildDayPlan(d, week, phase));
+    const plannedWeekTSS = dayPlans.reduce((sum, d) => sum + d.plannedTSS, 0);
+    return { week, phase, plannedWeekTSS, days: dayPlans };
   });
+}
+
+// Returns taper multiplier for a given week relative to race date
+export function getRaceWeekStatus(week: number, planStartDate: string | null, raceDate: string | null) {
+  if (!planStartDate || !raceDate) {
+    return { weeksToRace: null, taperLevel: 'none' as const, volumeMultiplier: 1, label: '' };
+  }
+  const weekMonday = new Date(planStartDate);
+  weekMonday.setDate(weekMonday.getDate() + (week - 1) * 7);
+  const race = new Date(raceDate);
+  const msPerWeek = 7 * 86400000;
+  const weeksToRace = Math.round((race.getTime() - weekMonday.getTime()) / msPerWeek);
+
+  if (weeksToRace === 0) return { weeksToRace, taperLevel: 'race' as const, volumeMultiplier: 0.50, label: '🏁 Race week' };
+  if (weeksToRace === 1) return { weeksToRace, taperLevel: 'heavy' as const, volumeMultiplier: 0.70, label: '⬇ Heavy taper' };
+  if (weeksToRace === 2) return { weeksToRace, taperLevel: 'light' as const, volumeMultiplier: 0.85, label: '⬇ Light taper' };
+  if (weeksToRace === -1) return { weeksToRace, taperLevel: 'recovery' as const, volumeMultiplier: 0.60, label: '↩ Recovery week' };
+  return { weeksToRace, taperLevel: 'none' as const, volumeMultiplier: 1, label: '' };
 }
 
 export const FULL_PLAN: WeekPlan[] = buildFullPlan();

@@ -25,12 +25,15 @@ export interface DayPlan {
   target: string;
   plannedMinutes: number;
   plannedKm?: number;
+  plannedTSS: number;
+  sessionIF: number;
   discipline: WorkoutType;
 }
 
 export interface WeekPlan {
   week: number;
   phase: string;
+  plannedWeekTSS: number;
   days: DayPlan[];
 }
 
@@ -38,6 +41,38 @@ export interface Phase {
   key: string;
   weeks: number[];
   focus: string;
+}
+
+export type TaperLevel = 'none' | 'light' | 'heavy' | 'race' | 'recovery';
+
+export interface RaceWeekStatus {
+  weeksToRace: number | null;
+  taperLevel: TaperLevel;
+  volumeMultiplier: number;
+  label: string;
+}
+
+export interface WeekCompliance {
+  plannedTSS: number;
+  actualTSS: number;
+  compliancePct: number;
+  bikeCompliancePct: number;
+  runCompliancePct: number;
+  kbCompliancePct: number;
+  bikeKmActual: number;
+  bikeKmPlanned: number;
+  runMinActual: number;
+  runMinPlanned: number;
+  kbMinActual: number;
+  kbMinPlanned: number;
+}
+
+export interface AppSettings {
+  planStartDate: string | null;
+  raceDate: string | null;
+  notificationsEnabled: boolean;
+  notificationHour: number;
+  notificationMinute: number;
 }
 
 export interface KBExercise {
@@ -76,6 +111,7 @@ export interface WeekStats {
   runMin: number;
   kbMin: number;
   totalMin: number;
+  totalTSS: number;
   bikeSessions: number;
   runSessions: number;
   kbSessions: number;

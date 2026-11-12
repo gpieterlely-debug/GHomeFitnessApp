@@ -88,21 +88,29 @@ public enum FunctionalTest: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public enum AssessorRole: String, Codable, CaseIterable, Sendable {
+    case patientSelfAssessed, clinician
+}
+
 public struct FunctionalAssessment: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var test: FunctionalTest
     public var date: Date
     public var passed: Bool
     public var assessedBy: String
+    /// Self-assessed results are allowed (patient runs the tests) and are
+    /// always labelled as such in summaries shown to clinicians.
+    public var assessorRole: AssessorRole
     public var result: String
 
     public init(id: UUID = UUID(), test: FunctionalTest, date: Date, passed: Bool,
-                assessedBy: String, result: String = "") {
+                assessedBy: String, assessorRole: AssessorRole = .patientSelfAssessed, result: String = "") {
         self.id = id
         self.test = test
         self.date = date
         self.passed = passed
         self.assessedBy = assessedBy
+        self.assessorRole = assessorRole
         self.result = result
     }
 }
@@ -131,6 +139,10 @@ public struct ProgressionRules: Codable, Equatable, Sendable {
     public var symptomRecencyHours: Double
     /// Consecutive stable check-ins that release a non-urgent hold.
     public var stableCheckInsToReleaseHold: Int
+    /// Categories whose functional tests only count when run by a clinician.
+    /// Default empty (patient runs the tests — confirmed v2.1). A clinician
+    /// can switch on high-risk categories (running, kettlebell, soccer).
+    public var clinicianAssessmentRequiredFor: Set<ActivityCategory> = []
 
     public func rule(for c: ActivityCategory) -> ProgressionRule {
         rules[c] ?? ProgressionRule(category: c, prerequisites: [], requiredAssessments: [])
@@ -158,7 +170,7 @@ public struct ProgressionRules: Codable, Equatable, Sendable {
                             requiredAssessments: [.strengthSymmetry, .hopTestSymmetry, .painFreeSprinting]),
         ].map { ($0.category, $0) }),
         symptomRecencyHours: 72,
-        stableCheckInsToReleaseHold: 3
+        stableCheckInsToReleaseHold: 3   // confirmed by patient, v2.1
     )
 }
 

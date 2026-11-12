@@ -12,6 +12,7 @@ public enum LockReason: Codable, Equatable, Hashable, Sendable, CustomStringConv
     case noExercisesListedByClinician
     case missingPrerequisite(ActivityCategory)
     case missingFunctionalAssessment(FunctionalTest)
+    case clinicianAssessmentRequired(FunctionalTest)
     case noRecentSymptomCheckIn
     case progressionHold
     case urgentSymptoms
@@ -23,6 +24,7 @@ public enum LockReason: Codable, Equatable, Hashable, Sendable, CustomStringConv
         case .noExercisesListedByClinician: return "Clinician did not list specific exercises"
         case .missingPrerequisite(let c): return "Prerequisite not documented as complete: \(c.displayName)"
         case .missingFunctionalAssessment(let t): return "Functional assessment not passed: \(t.displayName)"
+        case .clinicianAssessmentRequired(let t): return "Must be assessed by a clinician: \(t.displayName)"
         case .noRecentSymptomCheckIn: return "No symptom check-in in the last 72 hours"
         case .progressionHold: return "Progression on hold because symptoms worsened"
         case .urgentSymptoms: return "Urgent symptoms reported — stop and seek medical assessment"
@@ -89,9 +91,14 @@ public enum AccessEngine {
         for p in rule.prerequisites where !e.completions.contains(where: { $0.category == p && $0.completedOn <= date }) {
             reasons.append(.missingPrerequisite(p))
         }
+        let clinicianOnly = e.rules.clinicianAssessmentRequiredFor.contains(category)
         for t in rule.requiredAssessments {
-            let latest = e.functionalAssessments.filter { $0.test == t && $0.date <= date }.max { $0.date < $1.date }
-            if latest?.passed != true { reasons.append(.missingFunctionalAssessment(t)) }
+            let latest = e.functionalAssessments
+                .filter { $0.test == t && $0.date <= date && (!clinicianOnly || $0.assessorRole == .clinician) }
+                .max { $0.date < $1.date }
+            if latest?.passed != true {
+                reasons.append(clinicianOnly ? .clinicianAssessmentRequired(t) : .missingFunctionalAssessment(t))
+            }
         }
 
         let priorCheckIns = e.checkIns.filter { $0.date <= date }

@@ -15,7 +15,37 @@ final class SafetyTests: XCTestCase {
         XCTAssertEqual(r.plan.calendarWeek(on: ClinicalConfiguration.assessmentDate(calendar: Fx.calendar), calendar: Fx.calendar), 4)
         XCTAssertTrue(r.authorizations.isEmpty)
         XCTAssertEqual(r.appointments.first?.questions.count, Appointment.orthopedicQuestions.count)
-        XCTAssertTrue(r.pendingMilestones(at: Fx.day(21)).contains("Orthopedic assessment — not yet booked"))
+        XCTAssertTrue(r.pendingMilestones(at: Fx.day(21)).contains { $0.hasPrefix("Orthopedic assessment — booked") })
+    }
+
+    func testNov19VisitRemindersAndFindingsPrompt() {
+        let r = Fx.seeded()
+        let visit = ClinicalConfiguration.orthopedicAppointment(calendar: Fx.calendar)
+        XCTAssertEqual(r.appointments[0].scheduledAt, visit)
+        XCTAssertEqual(r.plan.calendarWeek(on: visit, calendar: Fx.calendar), 5)   // day 28
+        let reminders = ReminderPlanner.reminders(for: r.appointments, now: Fx.day(21))
+        XCTAssertEqual(reminders.map(\.fireDate), [visit.addingTimeInterval(-72 * 3600), visit.addingTimeInterval(-24 * 3600),
+                                                   visit.addingTimeInterval(-2 * 3600), visit.addingTimeInterval(2 * 3600)])
+        // Day after the visit, until findings are entered:
+        let after = Fx.day(29)
+        XCTAssertTrue(r.pendingMilestones(at: after).contains("Enter specialist findings: Orthopedic assessment"))
+        XCTAssertEqual(r.statusLabel(at: after), "PROTECTION — AWAITING CLINICAL ASSESSMENT")
+        XCTAssertTrue(ActivityCategory.restricted.allSatisfy { !r.access($0, at: after).isAvailable })
+    }
+
+    func testSelfAssessedTestsCountUnlessClinicianRequired() throws {
+        var r = Fx.seeded()
+        Fx.stableDays(&r, 60, 63)
+        let a = Fx.attestation(in: &r, on: Fx.day(60))
+        try r.addAuthorization(ClinicalAuthorization(category: .stationaryCycling,
+                                                     approvedExercises: [ApprovedExercise(name: "Stationary bike", parameters: "10 min, no resistance")],
+                                                     attestation: a, effectiveFrom: Fx.day(60)), now: Fx.day(60))
+        try r.recordFunctionalAssessment(FunctionalAssessment(test: .walkingWithoutLimp, date: Fx.day(61), passed: true, assessedBy: "Me"))
+        XCTAssertEqual(r.functionalAssessments[0].assessorRole, .patientSelfAssessed)
+        let now = Fx.day(63, hour: 12)
+        XCTAssertTrue(r.access(.stationaryCycling, at: now).isAvailable)
+        r.rules.clinicianAssessmentRequiredFor = [.stationaryCycling]
+        XCTAssertEqual(r.access(.stationaryCycling, at: now).lockReasons, [.clinicianAssessmentRequired(.walkingWithoutLimp)])
     }
 
     func testCheckInRequiresEveryField() {

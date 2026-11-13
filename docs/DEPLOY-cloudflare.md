@@ -14,7 +14,18 @@ Takes about 10 minutes. Free. Your GitHub repo stays private.
 | Root directory | *(leave empty)* |
 | Project name | something hard to guess, e.g. `rr-b31fe1` |
 
-## Steps
+## If you see "Could not detect a directory containing static files"
+
+You landed in **Workers**, not Pages. That's fine: the repo now includes `wrangler.jsonc`, which points Workers to `web/`.
+
+1. Open your Worker → **Settings → Build**.
+2. Set **Branch control → Production branch** to `claude/trusting-keller-sv6dmb`.
+3. Leave **Build command** empty. Set **Deploy command** to `npx wrangler deploy`. Set **Root directory** to `/`.
+4. The Worker name must be `rr-b31fe1`, matching `"name"` in `wrangler.jsonc`. If your Worker has another name, change that one line, or tell Claude the name.
+5. Go to **Deployments** and retry the build, or push any commit.
+6. Your address is `https://rr-b31fe1.<your-account>.workers.dev`. Use it from now on; the same "never change the address" rule applies.
+
+## Steps (Pages)
 
 1. Open **dash.cloudflare.com/sign-up** in Safari. Create a free account and verify your email.
 2. In the menu, tap **Workers & Pages**, then **Create**.

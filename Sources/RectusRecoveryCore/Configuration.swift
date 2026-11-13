@@ -13,6 +13,12 @@ public enum ClinicalConfiguration {
         calendar.date(from: DateComponents(year: 2026, month: 11, day: 12))!
     }
 
+    /// Orthopedic assessment booked for 19 Nov 2026.
+    /// ASSUMPTION: 09:00 local — edit in the app once the exact time is known.
+    public static func orthopedicAppointment(calendar: Calendar) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 9))!
+    }
+
     public static func initialRecord(calendar: Calendar) -> RecoveryRecord {
         let injury = injuryDate(calendar: calendar)
         let profile = PatientProfile(
@@ -34,7 +40,7 @@ public enum ClinicalConfiguration {
         record.addAppointment(Appointment(
             kind: .orthopedic,
             title: "Orthopedic assessment",
-            scheduledAt: nil, // patient enters date once booked
+            scheduledAt: orthopedicAppointment(calendar: calendar),
             questions: Appointment.orthopedicQuestions.map { ChecklistItem(question: $0) }))
         return record
     }

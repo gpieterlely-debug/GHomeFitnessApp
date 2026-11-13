@@ -29,3 +29,9 @@ description: Build or update a rehab/recovery app where clinician authorization 
 - SaMD/regulatory exposure if distributed beyond personal use.
 - Raw heart-rate volume → aggregate before beta.
 - Timing-sensitive clinical decisions (e.g., surgical windows) → push to get the specialist appointment booked.
+
+## No Mac? (learned 12 Nov 2026)
+1. Compile-check the iOS app on GitHub-hosted macOS: `brew install xcodegen` → `xcodegen` → `xcodebuild ... -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`. Pipe through `tail` but `exit ${PIPESTATUS[0]}`.
+2. Verify through the GitHub MCP: `actions_list` → `get_job_logs` and look for `** BUILD SUCCEEDED **`.
+3. Installing on a phone still needs signing: Apple Developer Program + TestFlight from CI, a rented cloud Mac, or a web app (no HealthKit; use a manual Apple Health export).
+4. Before an appointment, a printable one-page visit brief is worth more than the app.

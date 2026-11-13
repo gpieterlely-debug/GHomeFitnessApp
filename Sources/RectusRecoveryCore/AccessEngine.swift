@@ -95,14 +95,14 @@ public enum AccessEngine {
         for t in rule.requiredAssessments {
             let latest = e.functionalAssessments
                 .filter { $0.test == t && $0.date <= date && (!clinicianOnly || $0.assessorRole == .clinician) }
-                .max { $0.date < $1.date }
+                .latest(by: \.date)
             if latest?.passed != true {
                 reasons.append(clinicianOnly ? .clinicianAssessmentRequired(t) : .missingFunctionalAssessment(t))
             }
         }
 
         let priorCheckIns = e.checkIns.filter { $0.date <= date }
-        if let latest = priorCheckIns.max(by: { $0.date < $1.date }),
+        if let latest = priorCheckIns.latest(by: \.date),
            date.timeIntervalSince(latest.date) <= e.rules.symptomRecencyHours * 3600 {
             // Favorable symptom response is enforced through holds below.
         } else {
@@ -124,5 +124,12 @@ public enum AccessEngine {
 
     public static func progressionPaused(_ e: ClinicalEvidence, at date: Date) -> Bool {
         activeHold(e, at: date) != nil
+    }
+}
+
+extension Array {
+    /// Latest element by date; on equal dates the most recently appended wins.
+    func latest(by date: (Element) -> Date) -> Element? {
+        enumerated().max { (date($0.element), $0.offset) < (date($1.element), $1.offset) }?.element
     }
 }

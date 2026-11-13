@@ -151,6 +151,21 @@ final class SafetyTests: XCTestCase {
         XCTAssertEqual(r.authorizations.count, 1) // history kept
     }
 
+    func testSameTimestampEntriesMostRecentWins() throws {
+        var r = Fx.seeded()
+        let t = Fx.day(22)
+        r.addCheckIn(Fx.checkIn(t))
+        r.addCheckIn(Fx.checkIn(t, resting: 2, walking: 5, limp: .mild))
+        XCTAssertEqual(r.latestEvaluation(at: t)?.level, .worsening)
+        try r.recordFunctionalAssessment(FunctionalAssessment(test: .walkingWithoutLimp, date: t, passed: true, assessedBy: "Me"))
+        try r.recordFunctionalAssessment(FunctionalAssessment(test: .walkingWithoutLimp, date: t, passed: false, assessedBy: "Me"))
+        let a = Fx.attestation(in: &r, on: t)
+        try r.addAuthorization(ClinicalAuthorization(category: .stationaryCycling,
+                                                     approvedExercises: [ApprovedExercise(name: "Stationary bike", parameters: "10 min")],
+                                                     attestation: a, effectiveFrom: t), now: t)
+        XCTAssertTrue(r.access(.stationaryCycling, at: t).lockReasons.contains(.missingFunctionalAssessment(.walkingWithoutLimp)))
+    }
+
     func testCannotAuthorizeBaselineOrUpperBodyAsClinicalCategory() {
         var r = Fx.seeded()
         let a = Fx.attestation(in: &r, on: Fx.day(21))

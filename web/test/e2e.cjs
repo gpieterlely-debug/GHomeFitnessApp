@@ -33,10 +33,18 @@ const HK = `<?xml version="1.0"?><HealthData><ExportDate value="2026-11-13 09:00
 
   // 2. Check-in requires every field, then saves
   await open('#/checkin');
-  await page.click('text=Save check-in');
-  assert.ok(await page.evaluate(() => !document.querySelector('form').checkValidity()), 'incomplete form must not submit');
   const pick = (n, v) => page.locator(`input[name=${n}][value="${v}"] + span`).click();
-  await pick('restingPain', '1'); await pick('walkingPain', '3'); await pick('limp', 'none'); await pick('swelling', 'none');
+  await pick('restingPain', '1'); await pick('walkingPain', '3');
+  await page.click('text=Save check-in');
+  await page.waitForSelector('form .banner.error');
+  assert.match(await page.locator('form .banner.error').innerText(), /required items are missing/);
+  assert.ok(await page.locator('input[name=restingPain][value="1"]').isChecked(), 'entry kept after error');
+  assert.ok((await page.locator('fieldset.invalid').count()) >= 5, 'missing fields highlighted');
+  await page.click('nav.tabs >> text=Plan');
+  await page.click('nav.tabs >> text=Check-in');
+  await page.waitForSelector('.draft-note');
+  assert.ok(await page.locator('input[name=walkingPain][value="3"]').isChecked(), 'draft restored after tab switch');
+  await pick('limp', 'none'); await pick('swelling', 'none');
   await pick('stiffness', 'mild'); await pick('newWeakness', 'false'); await pick('nextDayResponse', 'same');
   await page.fill('input[name=activityDurationMinutes]', '30');
   await noHScroll();
@@ -44,6 +52,8 @@ const HK = `<?xml version="1.0"?><HealthData><ExportDate value="2026-11-13 09:00
   await page.click('text=Save check-in');
   await page.waitForSelector('.banner.ok');
   assert.match(await text(), /does not prove the tendon has healed/);
+  await open('#/checkin');
+  assert.equal(await page.locator('.draft-note').count(), 0, 'draft cleared after successful save');
 
   // 3. Restricted logging is blocked
   await open('#/log/stationaryCycling');
@@ -70,8 +80,17 @@ const HK = `<?xml version="1.0"?><HealthData><ExportDate value="2026-11-13 09:00
   await page.fill('input[name=clinicianName]', 'Dr. Test');
   await page.selectOption('select[name=sourceDocumentID]', { index: 1 });
   await page.fill('textarea[name=instructions]', 'Isometrics only. No cycling yet.');
-  await page.fill('textarea[name=approvedIsometrics]', 'Quadriceps set — 5 × 10 s at 30%\nGluteal squeeze — 5 × 10 s');
+  await page.fill('input[name=tearLocation]', 'Proximal direct head');
+  await page.fill('textarea[name=approvedIsometrics]', 'Quadriceps set');
   await page.selectOption('select[name=cyclingClearance]', 'notCleared');
+  await page.click('text=Save findings');
+  await page.waitForSelector('form .banner.error');
+  assert.match(await page.locator('form .banner.error').innerText(), /Missing dose/);
+  assert.equal(await page.inputValue('input[name=clinicianName]'), 'Dr. Test');
+  assert.equal(await page.inputValue('input[name=tearLocation]'), 'Proximal direct head');
+  assert.equal(await page.inputValue('select[name=cyclingClearance]'), 'notCleared');
+  assert.equal(await page.inputValue('textarea[name=instructions]'), 'Isometrics only. No cycling yet.');
+  await page.fill('textarea[name=approvedIsometrics]', 'Quadriceps set — 5 × 10 s at 30%\nGluteal squeeze — 5 × 10 s');
   await page.click('text=Save findings');
   await page.waitForSelector('text=Gentle isometric strengthening (2 exercises)');
   t = await text();

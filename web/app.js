@@ -36,6 +36,70 @@ function fail(e) {
   window.scrollTo(0, 0);
 }
 
+// Check-in field labels (from core's missing-field messages) → form field names, for highlighting.
+const FIELD_FOR_LABEL = { 'resting pain': 'restingPain', 'walking pain': 'walkingPain', 'limp status': 'limp', swelling: 'swelling',
+  stiffness: 'stiffness', 'new weakness': 'newWeakness', 'activity duration': 'activityDurationMinutes',
+  'next-day symptom response': 'nextDayResponse', 'assessed by': 'assessedBy', 'documented by': 'documentedBy' };
+
+/** The box to highlight: a radio group's whole question, otherwise the field's own label. */
+const fieldBox = (el) => (el?.type === 'radio' ? el.closest('fieldset') : el?.closest('label, fieldset'));
+
+/** Shows a form error IN PLACE. Never re-renders, so nothing the user typed is lost. */
+function failInForm(f, e, { keepMarks = false } = {}) {
+  if (!keepMarks) f.querySelectorAll('.invalid').forEach((el) => el.classList.remove('invalid'));
+  f.querySelector(':scope > .banner.error')?.remove();
+  for (const lbl of e?.detail && Array.isArray(e.detail) ? e.detail : []) {
+    const el = f.elements[FIELD_FOR_LABEL[lbl]];
+    fieldBox(el instanceof RadioNodeList ? el[0] : el)?.classList.add('invalid');
+  }
+  const div = document.createElement('div');
+  div.className = 'banner error';
+  div.setAttribute('role', 'alert');
+  div.innerHTML = `<strong>Not saved.</strong> ${esc(e?.message ?? String(e))}<br><small>Everything you entered is still here — fix the highlighted items and save again.</small>`;
+  f.prepend(div);
+  (f.querySelector('.invalid') ?? div).scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// ───────────────────────── Form drafts ─────────────────────────
+// Every form auto-saves as you type, so switching tabs, an error, or closing the app loses nothing.
+const draftKey = (f) => `rr-draft:${f.dataset.form}:${f.dataset.id ?? f.dataset.cat ?? ''}`;
+const NO_DRAFT = new Set(['extend', 'addAppointment', 'rules']);
+
+function saveDraft(f) {
+  if (!f?.dataset.form || NO_DRAFT.has(f.dataset.form)) return;
+  const data = {};
+  for (const el of f.elements) {
+    if (!el.name || el.type === 'file' || el.type === 'submit' || el.tagName === 'BUTTON') continue;
+    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; continue; }
+    if (el.type === 'checkbox') { (data[el.name] ??= []); if (el.checked) data[el.name].push(el.value); continue; }
+    data[el.name] = el.value;
+  }
+  try { localStorage.setItem(draftKey(f), JSON.stringify({ savedAt: Date.now(), data })); } catch { /* storage unavailable */ }
+}
+
+function clearDraft(f) { try { localStorage.removeItem(draftKey(f)); } catch { /* ignore */ } }
+
+function restoreDrafts() {
+  for (const f of app.querySelectorAll('form[data-form]')) {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(draftKey(f)) ?? 'null'); } catch { /* ignore */ }
+    if (!d) continue;
+    if (Date.now() - d.savedAt > 14 * 864e5) { clearDraft(f); continue; }
+    for (const el of f.elements) {
+      if (!el.name || !(el.name in d.data) || el.type === 'file') continue;
+      const v = d.data[el.name];
+      if (el.type === 'radio') el.checked = el.value === v;
+      else if (el.type === 'checkbox') el.checked = Array.isArray(v) && v.includes(el.value);
+      else el.value = v;
+    }
+    f.closest('details')?.setAttribute('open', '');
+    const note = document.createElement('p');
+    note.className = 'draft-note';
+    note.innerHTML = `Unsaved draft from ${fmtDateTime(d.savedAt)} restored. <button type="button" class="link" data-action="discardDraft">Discard draft</button>`;
+    f.prepend(note);
+  }
+}
+
 function go(hash, msg) {
   if (msg) flash = msg;
   if (location.hash === hash) render(); else location.hash = hash;
@@ -402,6 +466,7 @@ function render() {
   for (const [re, view] of routes) { const m = hash.match(re); if (m) { html = view(...m.slice(1)); break; } }
   app.innerHTML = `<main>${flashHtml()}${html}</main>
     <nav class="tabs">${tabs.map(([h, t]) => `<a href="${h}" class="${hash.startsWith(h) ? 'active' : ''}">${t}</a>`).join('')}</nav>`;
+  restoreDrafts();
   if (hash === '#/data') S.persist().then((p) => { const el = document.getElementById('persisted'); if (el) el.textContent = p ? 'yes' : 'no'; });
 }
 
@@ -502,6 +567,11 @@ const forms = {
 };
 
 const actions = {
+  discardDraft(el) {
+    const f = el.closest('form');
+    clearDraft(f);
+    render();
+  },
   async revoke(el) {
     const reason = prompt('Why is this authorization revoked? (e.g. clinician withdrew it)');
     if (!reason) return;
@@ -535,8 +605,29 @@ document.addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = f.querySelector('button:not([type=button])');
   if (btn) btn.disabled = true;
-  try { await h(f, new FormData(f)); } catch (err) { fail(err); } finally { if (btn) btn.disabled = false; }
+  // Clear the draft first (success re-renders the page); put it back if saving fails.
+  clearDraft(f);
+  try { await h(f, new FormData(f)); } catch (err) { saveDraft(f); failInForm(f, err); } finally { if (btn) btn.disabled = false; }
 });
+
+for (const type of ['input', 'change']) document.addEventListener(type, (e) => {
+  if (!e.target.form) return;
+  fieldBox(e.target)?.classList.remove('invalid');
+  saveDraft(e.target.form);
+});
+
+// Browser "required" checks: highlight every missing field and explain, without touching what was entered.
+document.addEventListener('invalid', (e) => {
+  const f = e.target.form;
+  if (!f) return;
+  e.preventDefault(); // suppress the easy-to-miss native bubble; we show our own message
+  fieldBox(e.target)?.classList.add('invalid');
+  clearTimeout(f._invalidTimer);
+  f._invalidTimer = setTimeout(() => {
+    const n = f.querySelectorAll('.invalid').length;
+    failInForm(f, new Error(`${n} required item${n === 1 ? ' is' : 's are'} missing (highlighted in red).`), { keepMarks: true });
+  }, 0);
+}, true);
 
 document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-action]');

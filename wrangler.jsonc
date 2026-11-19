@@ -1,0 +1,10 @@
+// Cloudflare Workers static-assets deploy of the Rectus Recovery web app.
+// "name" must match the Worker's name in the Cloudflare dashboard.
+// (Cloudflare Pages ignores this file and uses the dashboard's "Build output directory: web".)
+{
+  "name": "rr-b31fe1",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./web"
+  }
+}

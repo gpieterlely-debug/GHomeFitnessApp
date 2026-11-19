@@ -44,11 +44,11 @@ public struct RecoveryRecord: Codable, Equatable, Sendable {
 
     /// Phase changes only through documented clinician decisions; default is protection.
     public func phase(at date: Date) -> ClinicalPhase {
-        phaseChanges.filter { $0.effectiveDate <= date }.max { $0.effectiveDate < $1.effectiveDate }?.phase ?? .protection
+        phaseChanges.filter { $0.effectiveDate <= date }.latest(by: \.effectiveDate)?.phase ?? .protection
     }
 
     public func latestEvaluation(at date: Date) -> SymptomEvaluation? {
-        guard let latest = checkIns.filter({ $0.date <= date }).max(by: { $0.date < $1.date }) else { return nil }
+        guard let latest = checkIns.filter({ $0.date <= date }).latest(by: \.date) else { return nil }
         return SymptomEvaluator.evaluate(latest, history: checkIns, profile: profile)
     }
 

@@ -27,7 +27,7 @@ The app **records** clinical decisions. It never makes them.
 | Walking pain | 2–3/10 → baseline stored as **3** (conservative) |
 | Resting pain | Not reported → baseline **0** (**ASSUMPTION**: confirm at first check-in) |
 | Tolerated activity | Walking |
-| Orthopedic status | Awaiting assessment |
+| Orthopedic status | Awaiting assessment — **booked 19 Nov 2026** (day 28, week 5; time 09:00 is a placeholder) |
 | Physiotherapy | Not started |
 | Treatment pathway | Not yet confirmed |
 | Goals | Cycling, running, kettlebell workouts, kicking a soccer ball |
@@ -69,7 +69,7 @@ Nothing restricted is pre-authorized.
 | Level | Triggers | App behavior |
 |---|---|---|
 | **Urgent** | Any red flag · resting pain ≥ 7 · walking pain ≥ 8 · cannot bear weight · severe swelling · walking pain ≥ 4 above baseline · a rise of 3+ points within 48 h | Urgent banner (stop, same-day medical assessment, local emergency number for chest pain / breathlessness / cold or numb leg). **All** restricted work locks. Released **only** by a documented clinical review. |
-| **Worsening** | Walking or resting pain ≥ 2 above baseline · new or worse limp · new weakness · more swelling · worse the day after activity | "Hold progression" banner telling the patient to seek clinical review. No *new* category unlocks. Activities started before the hold continue only as directed, with no load increases. Released by a clinical review **or** 3 consecutive stable check-ins. |
+| **Worsening** | Walking or resting pain ≥ 2 above baseline · new or worse limp · new weakness · more swelling · worse the day after activity | "Hold progression" banner telling the patient to seek clinical review. No *new* category unlocks. Activities started before the hold continue only as directed, with no load increases. Released by a clinical review **or** 3 consecutive stable check-ins (**confirmed by patient, 12 Nov**). |
 | **Stable** | None of the above | "Stable pain does not prove the tendon has healed." |
 
 - Baseline = median of the previous 7 check-ins. Before any check-ins exist, the profile values are used.
@@ -104,6 +104,8 @@ Only explicit entries unlock anything. Any field left at **"Not addressed" unloc
 Each restricted category needs **all four** of these to become available:
 1. An active **clinician authorization** that lists specific exercises. Only those exercises can be logged.
 2. Passing results on the **functional assessments** it requires. The latest result counts, so a failed retest re-locks the category.
+   - **The patient runs the tests (confirmed 12 Nov).** Each result is stored with `assessorRole`, so self-assessed results are always labelled.
+   - A clinician can require clinician-run tests for specific categories (`clinicianAssessmentRequiredFor`). Recommended for running, dynamic kettlebell and soccer.
 3. A **favorable symptom response**: a check-in within the last 72 h and no active hold.
 4. **Documented completion of prerequisites.**
 
@@ -157,7 +159,13 @@ Default progression map (**ASSUMPTION**: an app scaffold for discussion with the
 | 6 | Health reports a 30 km ride → recorded, not clearance | `test06_…` | ✅ pass |
 | 7 | Week 16 without functional criteria → rehab continues | `test07_…` | ✅ pass |
 
-Plus 15 safety, HealthKit-deduplication and persistence tests. **22/22 pass** (Swift 6.0, Linux).
+Plus 17 safety, HealthKit-deduplication and persistence tests. **24/24 pass** (Swift 6.0, Linux).
+
+## 9a. Build without a Mac
+
+- There is **no Mac** (confirmed 12 Nov).
+- `.github/workflows/ci.yml` runs the core tests on Linux and compiles the iOS app (unsigned, simulator) on a GitHub-hosted Mac.
+- Installing on an iPhone still needs code signing. The options are open: see the README.
 
 ## 10. Architecture
 
@@ -179,7 +187,7 @@ App/RectusRecovery/           SwiftUI + HealthKit + notifications (iOS 17)
 ## 11. Known risks and open questions
 
 1. **Thresholds are not clinically validated.** Pain deltas, the 72 h recency window, the 3-stable-check-in release and the progression map are conservative defaults. Have the treating clinician review them.
-2. **Self-documented prerequisites.** Prerequisite completions and functional assessments can be entered by the patient. The clinician authorization is still required for each category, but the honesty of these entries is the weak link.
+2. **Self-run functional tests (confirmed choice).** Strength-symmetry and hop tests are hard to self-score reliably without a dynamometer or a second person. Mitigations: results are labelled "self-assessed", a clinician authorization is still required per category, and clinician-run tests can be required for high-risk categories.
 3. **Hold release by stable check-ins.** A worsening hold can clear without a clinician after 3 stable days. If this is too permissive, set `stableCheckInsToReleaseHold` very high so that a review is always required.
 4. **Heart-rate volume.** Raw heart-rate samples can number tens of thousands per month in a single JSON file. Aggregate them to hourly statistics before beta.
 5. **Regulatory.** As a personal tool this is fine. If it is distributed to other patients, an app that gates exercise based on symptoms may count as Software as a Medical Device (FDA / EU MDR). Get advice before sharing.

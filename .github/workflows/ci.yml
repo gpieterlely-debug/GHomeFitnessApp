@@ -1,0 +1,37 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  core-tests-linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+
+  web-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: cd web && npm test
+      - run: npx -y playwright@1.49.1 install --with-deps chromium && npm i --no-save playwright@1.49.1
+      - run: |
+          cd web && (python3 -m http.server 8080 &) && sleep 1 && node test/e2e.cjs
+
+  ios-app-build:
+    # Compiles the SwiftUI/HealthKit app on a GitHub-hosted Mac (no local Mac needed).
+    # Unsigned simulator build: proves it compiles; does not install on a phone.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: cd App && xcodegen
+      - run: |
+          xcodebuild -project App/RectusRecovery.xcodeproj -scheme RectusRecovery \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -50
+          exit ${PIPESTATUS[0]}
